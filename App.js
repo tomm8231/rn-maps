@@ -6,13 +6,15 @@ import * as Location from 'expo-location'
 import * as ImagePicker from 'expo-image-picker'
 import { app, database, storage } from './firebase.js'
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage'
-import { collection, addDoc, deleteDoc, updateDoc, doc, getDoc } from 'firebase/firestore';
+import { collection, addDoc, deleteDoc, updateDoc, doc, getDoc, GeoPoint } from 'firebase/firestore';
 import { useCollection } from 'react-firebase-hooks/firestore'
+import { googleMapIsInstalled } from 'react-native-maps/lib/decorateMapComponent.js';
 
 export default function App() {
 
   const [markers, setMarkers] = useState([])
   const [imagePath, setImagePath] = useState(null)
+
 
   const [ region, setRegion ] = useState( {
     latitude: 55,
@@ -54,38 +56,18 @@ export default function App() {
     startListening()
   })
 
-  function addMarker(data) {
+
+  async function uploadImage(data) {
     const { latitude, longitude } = data.nativeEvent.coordinate
+    const geoPoint = new GeoPoint(latitude, longitude)
     const newMarker = {
       coordinate: {latitude, longitude},
       key: data.timeStamp,
-      title: "Really good pizza"
     }
     setMarkers([...markers, newMarker])
-  }
 
-  function onMarkerPressed(text) {
-    Alert.alert(
-      'Overskrift',
-      '',
-      [
-        {
-          text: 'TILBAGE',
-        },
-        {
-          text: 'Vælg billede',
-          onPress: async () => {
-            // Create a copy of the noteList and remove the note at the specified id
-            await launchImagePicker()
-            .then(uploadImage())
-          },
-        },
-      ]
-    );
-  }
-
-  async function uploadImage() {
-
+    //Koble billede til database element fungerer ikke:
+/*
     try {
       const res = await fetch(imagePath)
       const blob = await res.blob()
@@ -99,12 +81,22 @@ export default function App() {
       const downloadURL = await getDownloadURL(snapshot.ref)
 
       setImagePath(downloadURL)
-      return downloadURL
 
     
   } catch (err) {
       console.log("Fejl: " + err);
   }
+  */
+
+  try {
+    await addDoc(collection(database, "photos"), {
+      geoPoint: geoPoint,
+      image: imagePath
+    })
+  } catch(error) {
+    console.log("Error: " + error);
+  }
+
   };
   
   async function launchImagePicker() {
@@ -122,14 +114,18 @@ export default function App() {
       <MapView
         style={styles.map}
         region={region}
-        onLongPress={addMarker}
+        onLongPress={
+          async (data) => {
+          // Create a copy of the noteList and remove the note at the specified id
+          await launchImagePicker()
+          .then((uploadImage(data)))}}
         >
           {markers.map(marker => (
             <Marker
               coordinate={marker.coordinate}
               key={marker.key}
               title={marker.title}
-              onPress={() => onMarkerPressed(marker.title)}
+              //onPress={() => onMarkerPressed(marker.title)}
             />
           ))}
       </MapView>
